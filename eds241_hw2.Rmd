@@ -1,0 +1,121 @@
+---
+title: 'EDS 241: Assignment 2'
+author: "Alexandra Yousefivand"
+date: '`r format(Sys.time(), "%m/%d/%Y")`'
+output: 
+  pdf_document:
+    toc: false
+    number_sections: yes
+header-includes:
+  \setlength{\parindent}{1em}
+  \usepackage{float}
+  \renewcommand{\thesection}{Question (\alph{section})}
+---
+
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE}
+
+# set default chunk options
+knitr::opts_chunk$set(fig.width = 4, fig.height = 3,
+                      echo = TRUE, message = FALSE, warning = FALSE)                     
+```
+
+
+```{r}
+# load packages
+packages=c("stargazer", "here", "tidyr", "dplyr","stringr", "janitor", 
+           "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "estimatr")
+
+for (i in packages) {
+  if (require(i,character.only=TRUE)==FALSE) {
+    install.packages(i,repos='http://cran.us.r-project.org')
+  }
+  else {
+    require(i,character.only=TRUE)
+  }
+}
+
+#devtools::install_github('rstudio/rmarkdown')
+options(scipen=999) # not scientific notation
+```
+
+```{r}
+# load data
+data_raw <- read.csv("NBP.csv")
+
+data <- data_raw %>% clean_names()
+```
+
+
+# Histogram
+
+```{r}
+histogram <- ggplot(data = data, mapping = aes(x = dnox_masstons)) +
+                    geom_histogram() +
+                    labs(x = "Change in NOX (mass tons)")
+
+histogram
+```
+
+# Indicator = 1 if pct_black > sample median, 0 otherwise
+
+```{r}
+# create indicator variable column
+data <- mutate(.data = data,
+                  D = case_when(pct_black >  median(data$pct_black) ~ 1,
+                                pct_black <= median(data$pct_black) ~ 0))
+```
+
+```{r}
+data_1 <- filter(.data = data, D == 1)
+
+avg_pct_black <- mean(data_1$pct_black)
+print(paste0(round(avg_pct_black, 2), "%"))
+```
+
+# Regression
+
+```{r}
+model <- lm_robust(formula = dnox_masstons ~ nbp, data = data)
+summary(model)
+```
+
+**Intercept** =  `r round(model$coefficient[1], 3)` tons
+
+\noindent If the county was NOT regulated under the NOx Budget Program (NBP = 0), the change in annual NOx emissions from all power plants in that county between 2000 and 2008
+
+**Slope coefficient** = `r round(model$coefficient[2], 3)` tons
+
+\noindent The difference in the change in annual NOx emissions from all power plants between 2000 and 2008 in a county regulated under the NOx Budget Program and another county NOT regulated under the NOx Budget Program (i.e. regulation / no regulation difference in annual NOx emissions)
+
+# Interaction between NBP andd D
+
+```{r}
+model_interaction <- lm_robust(formula = dnox_masstons ~ nbp + D + nbp:D,
+                               data = data)
+summary(model_interaction)
+```
+
+??????????
+
+**Intercept**: `r round(model$coefficient[1], 3)` tons
+
+\noindent The change in annual NOx emissions from all power plants in a county between 2000 and 2008, if the county was NOT regulated under the NOx Budget Program (NBP = 0)
+
+**NBP coefficient** = `r round(model_interaction$coefficient[2], 3)` tons
+
+\noindent The difference in the change in annual NOx emissions from all power plants between 2000 and 2008 in a county regulated under the NOx Budget Program and another county NOT regulated under the NOx Budget Program (i.e. regulation / no regulation difference in annual NOx emissions)
+
+**D coefficient** = `r round(model_interaction$coefficient[3], 3)` tons
+
+\noindent The difference in the change in annual NOx emissions from all power plants between 2000 and 2008 in a county with pct_black above the sample median compared to a county with pct_black below the sample median.
+
+
+**Interaction coefficient** = `r round(model_interaction$coefficient[4], 3)` tons
+
+\noindent The difference in the change in annual NOx emissions from all power plants between 2000 and 2008 in a county regulated under the NOx Budget Program and with pct_black above the sample median compared to another county NOT regulated under the NOx Budget Program and below the sample median.
+
+
+??????????
+
+
+# Prediction and 95% confidence interval
